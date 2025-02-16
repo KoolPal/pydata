@@ -1,0 +1,50 @@
+name: Track Shipment Status
+
+on:
+  workflow_dispatch:  # Manual trigger
+  schedule:
+    - cron: '*/30 * * * *'  # Every 30 minutes
+
+env:
+  TRACKING_NUMBER: '347720741487'
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10  # Prevent hung jobs
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Setup Chrome
+      uses: browser-actions/setup-chrome@v1
+      with:
+        chrome-version: stable
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install 'zendriver>=0.4.3' beautifulsoup4 lxml
+
+    - name: Run tracking script
+      env:
+        TRACKING_NUMBER: ${{ env.TRACKING_NUMBER }}
+        ZENDRIVER_LOG_LEVEL: INFO  # Enable detailed logging
+      run: python tracker.py
+      
+    - name: Upload tracking data
+      if: always()  # Upload even if script fails
+      uses: actions/upload-artifact@v4
+      with:
+        name: tracking-data-${{ github.run_id }}
+        path: |
+          tracking_data.json
+          tracking_screenshot.png
+        retention-days: 7
