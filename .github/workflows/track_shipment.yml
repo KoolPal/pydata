@@ -3,9 +3,6 @@ name: Track Shipment Status
 on:
   workflow_dispatch:
 
-env:
-  TRACKING_NUMBER: '347720741487'
-
 jobs:
   track:
     runs-on: ubuntu-latest
