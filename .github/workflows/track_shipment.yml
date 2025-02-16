@@ -11,6 +11,11 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
+    - name: Install Chrome and Xvfb
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y xvfb
+    
     - name: Install Chrome
       uses: browser-actions/setup-chrome@v1
       with:
@@ -24,8 +29,9 @@ jobs:
     - name: Install zendriver
       run: pip install zendriver==0.4.3
     
-    - name: Run tracking script
+    - name: Run with Xvfb
       env:
         ZENDRIVER_NO_SANDBOX: "true"
         ZENDRIVER_LOG_LEVEL: "INFO"
-      run: python tracker.py
+      run: |
+        xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" python tracker.py
