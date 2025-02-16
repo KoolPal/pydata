@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 from datetime import datetime
 import zendriver as zd
 from bs4 import BeautifulSoup
@@ -48,27 +49,43 @@ async def extract_tracking_data(content):
     }
 
 async def main():
+    browser = None
     print(f"Starting scraping at {datetime.utcnow().isoformat()}")
     
     try:
-        # Initialize the browser
-        browser = await zd.start(
-            headless=True,
-            browser_args=[
-                '--no-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-gpu'
-            ]
-        )
+        # Initialize the browser with specific configurations for GitHub Actions
+        config = zd.Config()
+        config.headless = True
+        config.no_sandbox = True  # Required for running in GitHub Actions
+        config.disable_dev_shm = True
+        config.browser_args = [
+            '--no-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--disable-software-rasterizer',
+            '--disable-extensions'
+        ]
+        
+        # Use the Chrome binary from browser-actions/setup-chrome
+        chrome_path = '/opt/hostedtoolcache/chrome/stable/x64/chrome'
+        if os.path.exists(chrome_path):
+            config.browser_executable_path = chrome_path
+        
+        # Initialize browser
+        browser = await zd.start(config)
+        print("Browser started successfully")
         
         # Create a new page and navigate to the tracking URL
         page = await browser.get('https://www.icarry.in/track-shipment?a=347720741487')
+        print("Navigated to tracking page")
         
         # Wait for the page to load completely
         await page.wait(5)  # Wait 5 seconds for any dynamic content
+        print("Page loaded")
         
         # Get the page content
         content = await page.get_content()
+        print("Retrieved page content")
         
         # Extract and process the data
         data = await extract_tracking_data(content)
@@ -94,6 +111,7 @@ async def main():
             
         # Take a screenshot for verification
         await page.save_screenshot('tracking_page.png')
+        print("Screenshot saved")
         
     except Exception as e:
         print(f"Error occurred: {str(e)}")
@@ -101,7 +119,12 @@ async def main():
         
     finally:
         # Always close the browser
-        await browser.stop()
+        if browser:
+            try:
+                await browser.stop()
+                print("Browser closed successfully")
+            except Exception as e:
+                print(f"Error closing browser: {str(e)}")
         print(f"Completed scraping at {datetime.utcnow().isoformat()}")
 
 if __name__ == "__main__":
