@@ -4,48 +4,37 @@ import os
 
 import zendriver as zd
 
-logging.basicConfig(
-    level=os.getenv('ZENDRIVER_LOG_LEVEL', 'INFO'),
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level="INFO")
 logger = logging.getLogger(__name__)
 
 async def main():
-    browser = None
-    tracking_number = os.getenv('TRACKING_NUMBER')
-    
     try:
+        # Focus only on browser launch settings
         config = zd.Config(
             headless=True,
-            sandbox=False,  # Required for GitHub Actions
+            sandbox=False,
+            no_sandbox=True,  # Explicitly set no_sandbox
             browser_executable_path='/usr/bin/google-chrome',
             browser_args=[
-                '--disable-dev-shm-usage',
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage'
             ]
         )
         
         logger.info("Starting browser")
         browser = await zd.Browser.create(config)
         
+        # Just try to load about:blank first to verify browser works
         page = await browser.new_page()
-        url = f'https://www.icarry.in/track-shipment?a={tracking_number}'
-        logger.info(f"Navigating to: {url}")
+        await page.goto("about:blank")
         
-        await page.goto(url)
-        await page.wait_for_ready_state("complete")
-        
-        # Print page content to verify access
-        content = await page.get_content()
-        print(content)
+        logger.info("Browser started successfully")
+        await browser.stop()
         
     except Exception as e:
-        logger.error(f"Error: {str(e)}")
+        logger.error(f"Browser start failed: {str(e)}")
         raise
-    finally:
-        if browser:
-            await browser.stop()
 
 if __name__ == "__main__":
     asyncio.run(main())
