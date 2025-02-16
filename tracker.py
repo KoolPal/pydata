@@ -1,19 +1,9 @@
-"""
-iCarry Tracking Script using Zendriver
-Author: KoolPal
-Created: 2025-02-16
-"""
-
 import asyncio
-import json
 import logging
 import os
-import sys
 from datetime import datetime, timezone
-from pathlib import Path
-from typing import Dict, Optional
+import json
 
-from bs4 import BeautifulSoup
 import zendriver as zd
 
 # Configure logging
@@ -23,149 +13,135 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Get environment variables
-CURRENT_USER = os.getenv('CURRENT_USER', 'Unknown')
-CURRENT_UTC = os.getenv('CURRENT_UTC')
-if CURRENT_UTC:
-    try:
-        CURRENT_TIME = datetime.strptime(CURRENT_UTC, '%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone.utc)
-    except ValueError:
-        logger.error(f"Invalid UTC time format: {CURRENT_UTC}")
-        CURRENT_TIME = datetime.now(timezone.utc)
-else:
-    CURRENT_TIME = datetime.now(timezone.utc)
-
-class TrackingError(Exception):
-    """Custom exception for tracking-related errors"""
-    pass
-
-async def extract_tracking_data(content: str) -> Dict:
-    """
-    Extract tracking information from the page content.
-    Uses BeautifulSoup for reliable HTML parsing.
-    """
-    try:
-        soup = BeautifulSoup(content, 'lxml')
-        
-        # Extract tracking status
-        status_elem = soup.select_one('div.tracking-status strong')
-        if not status_elem:
-            raise TrackingError("Could not find tracking status element")
-        
-        # Extract location and timestamp
-        location_elem = soup.select_one('div.current-location')
-        timestamp_elem = soup.select_one('div.last-update time')
-        
-        # Extract tracking events
-        events = []
-        for event in soup.select('div.tracking-event'):
-            events.append({
-                'date': event.select_one('.event-date').get_text(strip=True),
-                'time': event.select_one('.event-time').get_text(strip=True),
-                'location': event.select_one('.event-location').get_text(strip=True),
-                'description': event.select_one('.event-desc').get_text(strip=True)
-            })
-        
-        tracking_data = {
-            'tracking_number': os.getenv('TRACKING_NUMBER'),
-            'status': status_elem.get_text(strip=True),
-            'current_location': location_elem.get_text(strip=True) if location_elem else None,
-            'last_update': timestamp_elem.get_text(strip=True) if timestamp_elem else None,
-            'events': events,
-            'extracted_at': CURRENT_TIME.isoformat(),
-            'extracted_by': CURRENT_USER
-        }
-        
-        return tracking_data
-    
-    except Exception as e:
-        raise TrackingError(f"Failed to extract tracking data: {str(e)}") from e
+CURRENT_USER = os.getenv('CURRENT_USER', 'KoolPal')
+CURRENT_TIME = datetime.strptime(os.getenv('CURRENT_UTC', '2025-02-16 08:30:54'), '%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone.utc)
 
 async def main():
     browser = None
-    tracking_number = os.getenv('TRACKING_NUMBER')
-    if not tracking_number:
-        raise ValueError("TRACKING_NUMBER environment variable is required")
-    
-    logger.info(f"Starting tracking check at {CURRENT_TIME.isoformat()} by {CURRENT_USER}")
+    tracking_number = os.getenv('TRACKING_NUMBER', '347720741487')
     
     try:
-        # Configure browser with optimal settings based on recent issues
+        # Configure browser with comprehensive anti-detection based on all recent issues
         config = zd.Config(
-            headless=True,
-            sandbox=False,  # Required for GitHub Actions (issue #70)
-            browser_executable_path='/usr/bin/google-chrome',  # Explicit path for GitHub Actions
-            browser_connection_timeout=5.0,  # Increased timeout (issue #61)
+            headless=False,  # Issue #72: Headless immediately detected
+            sandbox=False,
+            expert=True,  # For shadow DOM access, but needs additional handling
+            browser_executable_path='/usr/bin/google-chrome',
+            browser_connection_timeout=10.0,
             browser_connection_max_tries=20,
             browser_args=[
-                '--disable-dev-shm-usage',  # Fix for CI environments
-                '--disable-blink-features=AutomationControlled',  # Reduce detection
-                '--disable-features=IsolateOrigins,site-per-process',
-                '--disable-site-isolation-trials'
+                # GPU/WebGL fixes from Issue #20
+                '--enable-unsafe-webgpu',
+                '--enable-features=Vulkan,SkiaGraphite',
+                '--use-gl=desktop',
+                '--enable-gpu-rasterization',
+                '--enable-zero-copy',
+                '--ignore-gpu-blocklist',
+                
+                # Memory/shm fixes
+                '--disable-dev-shm-usage',
+                '--no-sandbox',
+                
+                # Anti-detection from multiple issues
+                '--disable-blink-features=AutomationControlled',
+                '--disable-features=IsolateOrigins',
+                '--disable-site-isolation-trials',
+                
+                # Window properties
+                '--window-size=1920,1080',
+                '--start-maximized',
+                
+                # Additional Cloudflare bypass flags
+                '--enable-javascript',
+                '--enable-cookies',
+                '--disable-web-security',
+                '--disable-notifications',
+                '--no-default-browser-check'
             ]
         )
-        
-        logger.info("Initializing browser with config:")
-        logger.info(f"Executable: {config.browser_executable_path}")
-        logger.info(f"Connection timeout: {config.browser_connection_timeout}")
-        logger.info(f"Max retries: {config.browser_connection_max_tries}")
-        
-        # Initialize browser
+
+        logger.info(f"Starting browser at {CURRENT_TIME.isoformat()} as {CURRENT_USER}")
         browser = await zd.Browser.create(config)
-        logger.info("Browser started successfully")
         
-        # Create new tab and navigate
+        # Create new page with enhanced capabilities
         page = await browser.new_page()
-        logger.info("Created new page")
         
+        # Inject protections before navigation (from Issue #72 and #20)
+        await page.evaluate("""() => {
+            // Override common detection methods
+            Object.defineProperties(navigator, {
+                webdriver: { get: () => undefined },
+                // Add GPU capabilities (Issue #20)
+                gpu: { 
+                    get: () => ({
+                        wgpu: {
+                            requestAdapter: async () => ({
+                                name: 'NVIDIA GeForce RTX 3080',
+                                features: new Set(['texture-compression-bc'])
+                            })
+                        }
+                    })
+                },
+                // Additional properties
+                languages: { get: () => ['en-US', 'en'] },
+                deviceMemory: { get: () => 8 },
+                hardwareConcurrency: { get: () => 8 },
+                platform: { get: () => 'Linux x86_64' }
+            });
+
+            // WebGL fingerprint protection
+            const getParameter = WebGLRenderingContext.prototype.getParameter;
+            WebGLRenderingContext.prototype.getParameter = function(parameter) {
+                // Spoof common WebGL parameters
+                const spoofedParams = {
+                    37445: 'NVIDIA GeForce RTX 3080/PCIe/SSE2',
+                    37446: 'NVIDIA Corporation'
+                };
+                return spoofedParams[parameter] || getParameter.call(this, parameter);
+            };
+        }""")
+
         url = f'https://www.icarry.in/track-shipment?a={tracking_number}'
         logger.info(f"Navigating to: {url}")
         
-        # Navigate and wait for load
         await page.goto(url)
+        
+        # Handle Cloudflare challenge (Issue #64)
         await page.wait_for_ready_state("complete")
-        await page.wait(3)  # Additional wait for dynamic content
-        logger.info("Page loaded")
-        
-        # Take screenshot before extraction
-        screenshot_path = Path('tracking_screenshot.png')
-        await page.save_screenshot(screenshot_path)
-        logger.info(f"Screenshot saved to {screenshot_path}")
-        
-        # Get content and extract data
         content = await page.get_content()
-        tracking_data = await extract_tracking_data(content)
         
-        # Save tracking data
-        output_path = Path('tracking_data.json')
-        with open(output_path, 'w', encoding='utf-8') as f:
-            json.dump(tracking_data, indent=2, ensure_ascii=False, f)
-        logger.info(f"Tracking data saved to {output_path}")
+        # Check for Cloudflare elements
+        if "cf-" in content or "turnstile" in content:
+            logger.info("Detected Cloudflare challenge")
+            
+            # Handle shadow DOM elements (Issue #38)
+            await page.evaluate("""() => {
+                document.querySelectorAll('*').forEach(el => {
+                    if (el.shadowRoot) el.shadowRoot.mode = 'open'
+                })
+            }""")
+            
+            # Wait for challenge
+            await page.wait(10)
         
-        # Log summary
-        logger.info(f"Status: {tracking_data['status']}")
-        logger.info(f"Location: {tracking_data['current_location']}")
-        logger.info(f"Last Update: {tracking_data['last_update']}")
+        # Get final content
+        content = await page.get_content()
+        logger.info("Page HTML Content:")
+        print(content)
         
-    except TrackingError as e:
-        logger.error(f"Tracking data extraction failed: {str(e)}")
-        sys.exit(1)
+        # Save screenshot for verification
+        await page.save_screenshot('page.png')
+        logger.info("Screenshot saved as page.png")
+
     except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}")
+        logger.error(f"Error: {str(e)}")
         if browser and hasattr(browser, '_process'):
             stderr = await browser._process.stderr.read()
             logger.error(f"Chrome stderr output: {stderr.decode()}")
-        sys.exit(1)
     finally:
         if browser:
-            try:
-                await browser.stop()
-                logger.info("Browser closed successfully")
-            except Exception as e:
-                logger.error(f"Error closing browser: {str(e)}")
-        
-        duration = (datetime.now(timezone.utc) - CURRENT_TIME).total_seconds()
-        logger.info(f"Tracking check completed (duration: {duration:.2f}s)")
+            await browser.stop()
+            logger.info("Browser closed successfully")
 
 if __name__ == "__main__":
     asyncio.run(main())
