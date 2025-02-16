@@ -3,7 +3,7 @@ name: Scrape Tracking Data
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 */6 * * *'  # Runs every 6 hours
+    - cron: '0 */6 * * *'
 
 jobs:
   scrape:
@@ -26,7 +26,9 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install zendriver beautifulsoup4 lxml
+        pip install 'zendriver>=0.4.3' beautifulsoup4 lxml
 
     - name: Run scraping script
+      env:
+        ZENDRIVER_TEST_SANDBOX: "false"
       run: python scrape_tracking.py
