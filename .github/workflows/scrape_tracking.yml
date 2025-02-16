@@ -18,11 +18,11 @@ jobs:
       with:
         python-version: '3.11'
 
-    - name: Install Chrome
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y chromium-browser
-        
+    - name: Setup Chrome
+      uses: browser-actions/setup-chrome@v1
+      with:
+        chrome-version: stable
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
