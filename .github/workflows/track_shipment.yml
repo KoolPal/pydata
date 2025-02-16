@@ -7,6 +7,8 @@ on:
 
 env:
   TRACKING_NUMBER: '347720741487'
+  CURRENT_USER: 'KoolPal'
+  CURRENT_UTC: '2025-02-16 08:24:00'
 
 jobs:
   track:
@@ -22,8 +24,9 @@ jobs:
       with:
         python-version: '3.11'
         cache: 'pip'
+        cache-dependency-path: '**/requirements*.txt'
 
-    - name: Setup Chrome
+    - name: Setup Chrome 
       uses: browser-actions/setup-chrome@v1
       with:
         chrome-version: stable
@@ -31,16 +34,18 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install 'zendriver>=0.4.3' beautifulsoup4 lxml
+        pip install -r requirements.txt
 
     - name: Run tracking script
       env:
         TRACKING_NUMBER: ${{ env.TRACKING_NUMBER }}
-        ZENDRIVER_LOG_LEVEL: INFO  # Enable detailed logging
+        CURRENT_USER: ${{ env.CURRENT_USER }}
+        CURRENT_UTC: ${{ env.CURRENT_UTC }}
+        ZENDRIVER_LOG_LEVEL: INFO
       run: python tracker.py
       
     - name: Upload tracking data
-      if: always()  # Upload even if script fails
+      if: always()
       uses: actions/upload-artifact@v4
       with:
         name: tracking-data-${{ github.run_id }}
