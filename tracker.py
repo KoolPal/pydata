@@ -8,7 +8,11 @@ logger = logging.getLogger(__name__)
 async def main():
     try:
         logger.info("Starting browser")
-        browser = await zd.start(browser_executable_path="/usr/bin/google-chrome")
+        browser = await zd.start(
+            browser_executable_path="/usr/bin/google-chrome",
+            headless=True,
+            no_sandbox=True
+        )
         logger.info("Browser started successfully")
         await browser.stop()
         
