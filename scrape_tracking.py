@@ -54,25 +54,22 @@ async def main():
     
     try:
         # Initialize the browser with specific configurations for GitHub Actions
-        config = zd.Config()
-        config.headless = True
-        config.no_sandbox = True  # Required for running in GitHub Actions
-        config.disable_dev_shm = True
-        config.browser_args = [
-            '--no-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-gpu',
-            '--disable-software-rasterizer',
-            '--disable-extensions'
-        ]
-        
-        # Use the Chrome binary from browser-actions/setup-chrome
         chrome_path = '/opt/hostedtoolcache/chrome/stable/x64/chrome'
-        if os.path.exists(chrome_path):
-            config.browser_executable_path = chrome_path
         
-        # Initialize browser
-        browser = await zd.start(config)
+        # Initialize browser with correct arguments
+        browser = await zd.start(
+            headless=True,
+            no_sandbox=True,
+            disable_dev_shm=True,
+            browser_executable_path=chrome_path if os.path.exists(chrome_path) else None,
+            extra_args=[
+                '--no-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--disable-software-rasterizer',
+                '--disable-extensions'
+            ]
+        )
         print("Browser started successfully")
         
         # Create a new page and navigate to the tracking URL
