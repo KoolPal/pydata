@@ -23,6 +23,18 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Get environment variables
+CURRENT_USER = os.getenv('CURRENT_USER', 'Unknown')
+CURRENT_UTC = os.getenv('CURRENT_UTC')
+if CURRENT_UTC:
+    try:
+        CURRENT_TIME = datetime.strptime(CURRENT_UTC, '%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone.utc)
+    except ValueError:
+        logger.error(f"Invalid UTC time format: {CURRENT_UTC}")
+        CURRENT_TIME = datetime.now(timezone.utc)
+else:
+    CURRENT_TIME = datetime.now(timezone.utc)
+
 class TrackingError(Exception):
     """Custom exception for tracking-related errors"""
     pass
@@ -60,7 +72,8 @@ async def extract_tracking_data(content: str) -> Dict:
             'current_location': location_elem.get_text(strip=True) if location_elem else None,
             'last_update': timestamp_elem.get_text(strip=True) if timestamp_elem else None,
             'events': events,
-            'extracted_at': datetime.now(timezone.utc).isoformat()
+            'extracted_at': CURRENT_TIME.isoformat(),
+            'extracted_by': CURRENT_USER
         }
         
         return tracking_data
@@ -74,8 +87,7 @@ async def main():
     if not tracking_number:
         raise ValueError("TRACKING_NUMBER environment variable is required")
     
-    start_time = datetime.now(timezone.utc)
-    logger.info(f"Starting tracking check at {start_time.isoformat()}")
+    logger.info(f"Starting tracking check at {CURRENT_TIME.isoformat()} by {CURRENT_USER}")
     
     try:
         # Configure browser with optimal settings based on recent issues
@@ -152,9 +164,8 @@ async def main():
             except Exception as e:
                 logger.error(f"Error closing browser: {str(e)}")
         
-        end_time = datetime.now(timezone.utc)
-        duration = (end_time - start_time).total_seconds()
-        logger.info(f"Tracking check completed at {end_time.isoformat()} (duration: {duration:.2f}s)")
+        duration = (datetime.now(timezone.utc) - CURRENT_TIME).total_seconds()
+        logger.info(f"Tracking check completed (duration: {duration:.2f}s)")
 
 if __name__ == "__main__":
     asyncio.run(main())
