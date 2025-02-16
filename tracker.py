@@ -13,11 +13,20 @@ async def main():
             headless=True,
             no_sandbox=True
         )
-        logger.info("Browser started successfully")
+        
+        logger.info("Opening tracking page")
+        tab = await browser.new_tab()
+        await tab.goto("https://www.icarry.in/track-shipment?a=347720741487")
+        
+        # Just get and log the content
+        content = await tab.get_content()
+        logger.info("Page content:")
+        print(content)
+        
         await browser.stop()
         
     except Exception as e:
-        logger.error(f"Browser start failed: {str(e)}")
+        logger.error(f"Error: {str(e)}")
         raise
 
 if __name__ == "__main__":
